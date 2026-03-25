@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
 from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +8,11 @@ from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sqlalchemy.dialects.postgresql import ARRAY
 from pydantic import BaseModel
 from typing import List, Optional
+import csv
+import json
+import io
+import time
+import uuid
 import os
 from langchain_openai import ChatOpenAI
 import httpx  # For making outgoing AI requests
@@ -286,3 +291,130 @@ def delete_milestone(id: str, db: Session = Depends(get_db)):
     db.query(DBMilestone).filter(DBMilestone.id == id).delete()
     db.commit()
     return {"status": "deleted"} 
+
+# --- FILE IMPORT / EXPORT ---
+@app.post("/import")
+async def import_data(
+    file: UploadFile = File(...), 
+    import_type: str = Form("tasks"), 
+    pid: Optional[str] = Form(None), 
+    db: Session = Depends(get_db)
+):
+    try:
+        content = await file.read()
+        
+        # 1. Handle CSV Import
+        if file.filename.endswith('.csv'):
+            decoded = content.decode('utf-8-sig') # '-sig' handles Excel formatting quirks
+            reader = csv.DictReader(io.StringIO(decoded))
+            headers = reader.fieldnames
+            
+            # VALIDATION 1: Is the CSV completely empty?
+            if not headers:
+                raise HTTPException(status_code=400, detail="The CSV file is empty or unreadable.")
+
+            count = 0
+            
+            # --- IMPORT PROJECTS ---
+            if import_type == "projects":
+                # STRICT VALIDATION: Must have a 'name' column
+                if 'name' not in headers:
+                    raise HTTPException(status_code=400, detail="Invalid CSV format. A Project CSV must contain at least a 'name' column.")
+                    
+                for row in reader:
+                    proj_id = row.get('id', str(uuid.uuid4())[:8]).strip() or str(uuid.uuid4())[:8]
+                    new_proj = DBProject(
+                        id=proj_id,
+                        name=row.get('name'),
+                        desc=row.get('desc', ''),
+                        start=row.get('start', ''),
+                        end=row.get('end', ''),
+                        sprint=int(row.get('sprint', 1)) if str(row.get('sprint', '1')).isdigit() else 1,
+                        sprints=int(row.get('sprints', 12)) if str(row.get('sprints', '12')).isdigit() else 12,
+                        status=row.get('status', 'On Track'),
+                        updatedAt=int(time.time() * 1000)
+                    )
+                    
+                    existing = db.query(DBProject).filter(DBProject.id == proj_id).first()
+                    if existing:
+                        for key, value in new_proj.__dict__.items():
+                            if not key.startswith('_'): setattr(existing, key, value)
+                    else:
+                        db.add(new_proj)
+                    count += 1
+
+            # --- IMPORT TASKS ---
+            elif import_type == "tasks":
+                if not pid:
+                    raise HTTPException(status_code=400, detail="Please select a project first to import tasks.")
+                
+                # STRICT VALIDATION: Must have a 'name' column
+                if 'name' not in headers:
+                    raise HTTPException(status_code=400, detail="Invalid CSV format. A Task CSV must contain at least a 'name' column.")
+                
+                for row in reader:
+                    task_id = row.get('id', str(uuid.uuid4())[:8]).strip() or str(uuid.uuid4())[:8]
+                    new_task = DBTask(
+                        id=task_id,
+                        pid=pid,
+                        name=row.get('name'),
+                        ticket=row.get('ticket',''),
+                        comp=row.get('comp', ''),
+                        status=row.get('status', 'To Do'),
+                        prio=row.get('priority', 'Medium'),
+                        sp=int(row.get('sp', 0)) if str(row.get('sp', '0')).isdigit() else 0,
+                        assignee=row.get('assignee', ''),
+
+                        sprint=int(row.get('sprint', 1)) if str(row.get('sprint', '1')).isdigit() else 1,
+                        prog=int(row.get('prog', 0)) if str(row.get('prog', '0')).isdigit() else 0,
+                        start=row.get('start', ''),
+                        end=row.get('end', ''),
+                        notes=row.get('notes', ''),
+
+                        updatedAt=int(time.time() * 1000)
+                    )
+                    existing = db.query(DBTask).filter(DBTask.id == task_id).first()
+                    if existing:
+                        for key, value in new_task.__dict__.items():
+                            if not key.startswith('_'): setattr(existing, key, value)
+                    else:
+                        db.add(new_task)
+                    count += 1
+                    
+            db.commit()
+            return {"message": f"Successfully imported {count} {import_type} from CSV!"}
+        
+        # 2. Handle JSON Import (Full Backup)
+        elif file.filename.endswith('.json'):
+            data = json.loads(content.decode('utf-8'))
+            # Import Project
+            p_data = data.get("project")
+            if p_data:
+                existing_p = db.query(DBProject).filter(DBProject.id == p_data["id"]).first()
+                if existing_p:
+                    for k, v in p_data.items(): setattr(existing_p, k, v)
+                else:
+                    db.add(DBProject(**p_data))
+                    
+            # Import Tasks
+            tasks_added = 0
+            for t_data in data.get("tasks", []):
+                existing_t = db.query(DBTask).filter(DBTask.id == t_data["id"]).first()
+                if existing_t:
+                    for k, v in t_data.items(): setattr(existing_t, k, v)
+                else:
+                    db.add(DBTask(**t_data))
+                tasks_added += 1
+                
+            db.commit()
+            return {"message": f"Successfully restored project and {tasks_added} tasks!"}
+            
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type. Please upload .csv or .json")
+            
+    except HTTPException:
+        # Pass our custom validation errors directly back to the frontend
+        raise 
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")

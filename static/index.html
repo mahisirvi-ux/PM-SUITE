@@ -503,6 +503,14 @@ pre{background:var(--surface2);border:1px solid var(--b);border-radius:8px;paddi
       <div class="card">
         <div class="ch"><span class="ch-t">Upload Project File</span></div>
         <div class="cb">
+
+          <div class="fg" style="margin-bottom: 14px;">
+            <label>What are you importing? (CSV only)</label>
+            <select id="import-type" style="width: 100%;">
+              <option value="projects">New Projects</option>
+              <option value="tasks" selected>Tasks (Requires selected project)</option>
+            </select>
+          </div>
           <div class="drop-zone" id="dz" onclick="document.getElementById('fi').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="onDrop(event)">
             <svg viewBox="0 0 24 24"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z"/></svg>
             <h4>Drop your file here or <em>browse</em></h4>
@@ -748,6 +756,102 @@ async function switchProj(id) {
   localStorage.setItem('curPid', id);
   await loadProjectData(id);
   refresh();
+}
+/* ══════════════════════════════
+   IMPORT / EXPORT LOGIC
+══════════════════════════════ */
+async function uploadFile(file) {
+    if(!file) return;
+
+    // 1. Get the import type
+    const impTypeEl = document.getElementById('import-type');
+    const impType = impTypeEl ? impTypeEl.value : 'tasks';
+
+    // 2. Block task uploads if no project is selected
+    if(impType === 'tasks' && !curPid && file.name.endsWith('.csv')) {
+        toast("Please select a project first to import tasks.", "err");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("import_type", impType); 
+    if (curPid) formData.append("pid", curPid);
+
+    try {
+        // UI Feedback
+        document.getElementById('uprog').style.display = 'block';
+        document.getElementById('uprog-name').textContent = file.name;
+        document.getElementById('uprog-fill').style.width = '60%';
+        document.getElementById('ustatus').textContent = "Uploading to Database...";
+        
+        const res = await fetch(`${API_BASE}/import`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const data = await res.json();
+        document.getElementById('uprog-fill').style.width = '100%';
+        
+        if (res.ok) {
+            document.getElementById('ustatus').textContent = "Success!";
+            toast(data.message || "Import successful!");
+            await loadInitialData(); // Reload UI with fresh DB data
+        } else {
+            document.getElementById('ustatus').textContent = "Failed.";
+            // Handle FastAPI validation errors (which come back as arrays)
+            let errMsg = data.detail || "Import failed";
+            if (Array.isArray(data.detail)) errMsg = "Backend rejected the format. Check terminal for details.";
+            toast(errMsg, "err");
+        }
+    } catch(e) {
+        toast("Network error. Is your FastAPI server running?", "err");
+    } finally {
+        setTimeout(() => { 
+            document.getElementById('uprog').style.display = 'none'; 
+            document.getElementById('ustatus').textContent = "";
+        }, 3000);
+    }
+}
+
+// THE MISSING TRIGGERS: These link the HTML to the upload function!
+function onFileInput(e) {
+    const file = e.target.files[0];
+    if (file) uploadFile(file);
+    e.target.value = ""; // Reset input so you can upload the same file twice
+}
+
+function onDrop(e) {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag');
+    const file = e.dataTransfer.files[0];
+    if (file) uploadFile(file);
+}
+
+// Export logic
+function exportAll() {
+    if(!curPid) return toast("No project to export", "err");
+    const data = { project: curProj(), tasks: pTasks(curPid) };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `PM_Export_${curPid}.json`;
+    a.click();
+}
+
+function exportTasks() {
+    const tasks = pTasks(curPid);
+    if(!tasks.length) return toast("No tasks to export", "err");
+    const headers = ["name", "ticket", "comp", "status", "priority", "sp", "assignee"];
+    const csv = [
+        headers.join(","),
+        ...tasks.map(t => [ `"${t.name||''}"`, `"${t.ticket||''}"`, `"${t.comp||''}"`, `"${t.status||''}"`, `"${t.prio||''}"`, t.sp||0, `"${t.assignee||''}"` ].join(","))
+    ].join("\n");
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Tasks_${curPid}.csv`;
+    a.click();
 }
 
 /* ══════════════════════════════
