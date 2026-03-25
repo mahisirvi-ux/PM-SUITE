@@ -1282,15 +1282,32 @@ function fmt(t){ return t.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replac
 function showTyp(){ const el=document.getElementById('msgs'); const d=document.createElement('div'); d.className='cm';d.id='typ'; const av=document.createElement('div');av.className='cav b';av.innerHTML=`<svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>`; const b=document.createElement('div');b.className='cbub tydots';b.innerHTML='<div class="td"></div><div class="td"></div><div class="td"></div>'; d.appendChild(av);d.appendChild(b);el.appendChild(d);el.scrollTop=el.scrollHeight; }
 function hideTyp(){ const e=document.getElementById('typ'); if(e) e.remove(); }
 async function callAI(msg){
-  const ctx=buildCtx();
-  const sys=`You are a project management AI agent in BUSINESSNEXT PM Suite. You have access to the user's live project data shown below. Answer based on this real data. Be concise, structured, and actionable.\n\nLIVE PROJECT DATA:\n${ctx}`;
-  const msgs=hist[curAgent].slice(0,-1).map(m=>({role:m.r==='bot'?'assistant':'user',content:m.c}));
-  msgs.push({role:'user',content:msg});
+  const ctx = buildCtx();
+  const msgs = hist[curAgent].slice(0,-1).map(m => ({role: m.r === 'bot' ? 'assistant' : 'user', content: m.c}));
+  
   showTyp();
-  try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,system:sys,messages:msgs})});
-    const d=await r.json(); hideTyp(); appendMsg('bot',d.content?.[0]?.text||'Error — please try again.');
-  }catch(e){ hideTyp(); appendMsg('bot','Connection error. Note: AI calls currently trigger CORS blocks from browsers. Next step: Move this to the FastAPI backend!'); }
+  try {
+    // We are now pointing to YOUR local FastAPI server!
+    const r = await fetch(`${API_BASE}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        agent: curAgent,
+        message: msg,
+        context: ctx,
+        history: msgs
+      })
+    });
+    
+    const d = await r.json();
+    hideTyp(); 
+    appendMsg('bot', d.reply || 'Error — please try again.');
+    
+  } catch(e) {
+    hideTyp(); 
+    appendMsg('bot', 'Connection error. Make sure your FastAPI server is running!'); 
+    console.error(e);
+  }
 }
 function sendMsg(){ const ta=document.getElementById('cta'); const t=ta.value.trim(); if(!t)return; appendMsg('user',t); ta.value=''; ta.style.height='auto'; callAI(t); }
 function sendChip(t){ appendMsg('user',t); callAI(t); }

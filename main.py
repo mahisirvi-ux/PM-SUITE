@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -8,10 +9,11 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from pydantic import BaseModel
 from typing import List, Optional
 import os
-
+from langchain_openai import ChatOpenAI
+import httpx  # For making outgoing AI requests
+load_dotenv()
 # --- DATABASE SETUP ---
-# Update with your actual postgres username and password
-DATABASE_URL = "postgresql://postgres:root@localhost:5432/businessnext_pm"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -85,7 +87,6 @@ class DBMilestone(Base):
     tasks = Column(ARRAY(String))
     updatedAt = Column(BigInteger)
 
-# Create tables in the database
 Base.metadata.create_all(bind=engine)
 
 # --- PYDANTIC SCHEMAS ---
@@ -98,10 +99,15 @@ class TaskSchema(BaseModel):
     assignee: Optional[str] = None; sprint: int; sp: int; prio: str; status: str
     prog: int; start: Optional[str] = None; end: Optional[str] = None; notes: Optional[str] = None; updatedAt: int
 
+class ChatRequest(BaseModel):
+    agent: str
+    message: str
+    context: str
+    history: list = []
+
 # --- FASTAPI APP ---
 app = FastAPI()
 
-# 1. Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -110,13 +116,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 2. Mount the static directory (Ensure the 'static' folder exists)
-# This allows the browser to load CSS, JS, or images if you add them to the static folder later.
 if not os.path.exists("static"):
     os.makedirs("static")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# 3. Serve the HTML frontend on the root URL
 @app.get("/")
 def serve_frontend():
     return FileResponse("static/index.html")
@@ -130,6 +133,52 @@ def get_db():
         db.close()
 
 # --- API ROUTES ---
+
+# AI CHAT PROXY
+@app.post("/chat")
+async def chat_with_ai(request: ChatRequest):
+    """
+    Proxies calls to the AI provider to bypass CORS and hide API keys.
+    """
+    api_key = os.getenv("OPENAI_API_KEY")
+    api_url = os.getenv("OPENAI_API_URL")
+
+    # 1. Build the memory array for OpenAI
+    messages = [
+        {"role": "system", "content": f"You are the {request.agent.capitalize()} agent in BUSINESSNEXT PM Suite. Answer using this live data:\n{request.context}"}
+    ]
+    # Add previous chat history
+    for msg in request.history:
+        messages.append(msg)
+    # Add the newest user message
+    messages.append({"role": "user", "content": request.message})
+
+    # 2. Mock fallback (So your app doesn't crash if you haven't added an API key yet)
+    if api_key == "YOUR_ACTUAL_KEY_HERE":
+        return {"reply": f"🤖 **Mock Response from {request.agent.capitalize()} Agent**:\n\nI received your message: `{request.message}`.\n\n*Note: Replace 'YOUR_ACTUAL_KEY_HERE' in main.py to get real AI responses!*"}
+
+    # 3. Call OpenAI
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                api_url,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": messages
+                },
+                timeout=45.0
+            )
+            data = response.json()
+            
+            # 4. Safely extract the text response
+            if "choices" in data:
+                return {"reply": data["choices"][0]["message"]["content"]}
+            else:
+                return {"reply": f"API Error: {data}"}
+                
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
 # Projects
 @app.get("/projects", response_model=List[ProjectSchema])
@@ -174,7 +223,9 @@ def delete_task(task_id: str, db: Session = Depends(get_db)):
 # Risks
 @app.get("/risks/{pid}", response_model=List[dict])
 def read_risks(pid: str, db: Session = Depends(get_db)):
-    return [r.__dict__ for r in db.query(DBRisk).filter(DBRisk.pid == pid).all()]
+    risks = db.query(DBRisk).filter(DBRisk.pid == pid).all()
+    # Filter out hidden SQLAlchemy properties so it converts to JSON cleanly
+    return [{k: v for k, v in r.__dict__.items() if not k.startswith("_")} for r in risks]
 
 @app.post("/risks")
 def save_risk(risk: dict, db: Session = Depends(get_db)):
@@ -195,7 +246,8 @@ def delete_risk(id: str, db: Session = Depends(get_db)):
 # Resources
 @app.get("/resources/{pid}", response_model=List[dict])
 def read_resources(pid: str, db: Session = Depends(get_db)):
-    return [r.__dict__ for r in db.query(DBResource).filter(DBResource.pid == pid).all()]
+    resources = db.query(DBResource).filter(DBResource.pid == pid).all()
+    return [{k: v for k, v in r.__dict__.items() if not k.startswith("_")} for r in resources]
 
 @app.post("/resources")
 def save_resource(res: dict, db: Session = Depends(get_db)):
@@ -216,7 +268,8 @@ def delete_resource(id: str, db: Session = Depends(get_db)):
 # Milestones
 @app.get("/milestones/{pid}", response_model=List[dict])
 def read_milestones(pid: str, db: Session = Depends(get_db)):
-    return [m.__dict__ for m in db.query(DBMilestone).filter(DBMilestone.pid == pid).all()]
+    milestones = db.query(DBMilestone).filter(DBMilestone.pid == pid).all()
+    return [{k: v for k, v in m.__dict__.items() if not k.startswith("_")} for m in milestones]
 
 @app.post("/milestones")
 def save_milestone(ms: dict, db: Session = Depends(get_db)):
@@ -232,4 +285,4 @@ def save_milestone(ms: dict, db: Session = Depends(get_db)):
 def delete_milestone(id: str, db: Session = Depends(get_db)):
     db.query(DBMilestone).filter(DBMilestone.id == id).delete()
     db.commit()
-    return {"status": "deleted"}
+    return {"status": "deleted"} 
