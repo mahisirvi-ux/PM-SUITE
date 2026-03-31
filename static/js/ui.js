@@ -3,7 +3,7 @@
 ══════════════════════════════ */
 
 /* --- NAVIGATION & TOASTS --- */
-const TABS = ['dashboard','tasks','gantt','chat','risks','resources','delivery','import'];
+const TABS = ['dashboard','tasks','gantt','chat','risks','resources','delivery','import', 'pl'];
 
 function nav(tab, agent){
     TABS.forEach(t => document.getElementById('p-'+t).classList.toggle('on', t === tab));
@@ -158,6 +158,7 @@ function refresh(){
     renderRisks();
     renderResources();
     renderDelivery();
+    renderPL();
     if(typeof refreshChatSide === "function") refreshChatSide(p);
     refreshBadges(p);
     refreshDataSummary();
@@ -420,6 +421,157 @@ function showSchema(type, btn){
     document.querySelectorAll('.stab').forEach(b=>b.classList.remove('on'));
     if(btn) btn.classList.add('on');
     document.getElementById('schema-pre').textContent=SCHEMAS[type];
+}
+
+/* ══════════════════════════════
+   P&L MODULE RENDERERS
+══════════════════════════════ */
+
+const fmtINR = v => {
+  if(Math.abs(v)>=10000000) return '₹'+(v/10000000).toFixed(2)+'Cr';
+  if(Math.abs(v)>=100000) return '₹'+(v/100000).toFixed(2)+'L';
+  if(Math.abs(v)>=1000) return '₹'+(v/1000).toFixed(1)+'K';
+  return '₹'+v.toLocaleString('en-IN');
+};
+
+function openPLEntryModal(id){
+  const e = id ? getAllPL().find(x=>x.id===id) : null;
+  document.getElementById('mpl-ttl').textContent = e ? 'Edit Entry' : 'Add P&L Entry';
+  document.getElementById('mpl-id').value = e?.id||'';
+  document.getElementById('mpl-type').value = e?.type||'Cost';
+  document.getElementById('mpl-cat').value = e?.cat||'Labour';
+  document.getElementById('mpl-desc').value = e?.desc||'';
+  document.getElementById('mpl-period').value = e?.period||'';
+  document.getElementById('mpl-status').value = e?.status||'Planned';
+  document.getElementById('mpl-budget').value = e?.budget||0;
+  document.getElementById('mpl-actual').value = e?.actual||0;
+  document.getElementById('mpl-forecast').value = e?.forecast||0;
+  document.getElementById('mpl-owner').value = e?.owner||'';
+  document.getElementById('mpl-notes').value = e?.notes||'';
+  openM('m-pl');
+}
+
+function renderPL(){
+  const p = curProj();
+  if(!p){
+    ['pl-kpis','pl-tbody','pl-chart','pl-chart-lbls','pl-summary','pl-rev-breakdown','pl-cost-breakdown'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.innerHTML='<div class="empty" style="grid-column:1/-1"><h3>No project selected</h3></div>';
+    }); return;
+  }
+  document.getElementById('pl-sub').textContent = `${p.name} · Financial Dashboard`;
+  const typeF = document.getElementById('pl-filter-type')?.value||'';
+  const catF = document.getElementById('pl-filter-cat')?.value||'';
+  let entries = pPL(p.id);
+
+  // totals
+  const rev = entries.filter(e=>e.type==='Revenue');
+  const cost = entries.filter(e=>e.type==='Cost');
+  const totBudRev=rev.reduce((a,e)=>a+e.budget,0), totActRev=rev.reduce((a,e)=>a+e.actual,0), totFcstRev=rev.reduce((a,e)=>a+e.forecast,0);
+  const totBudCost=cost.reduce((a,e)=>a+e.budget,0), totActCost=cost.reduce((a,e)=>a+e.actual,0), totFcstCost=cost.reduce((a,e)=>a+e.forecast,0);
+  const grossBudProfit=totBudRev-totBudCost, grossActProfit=totActRev-totActCost, grossFcstProfit=totFcstRev-totFcstCost;
+  const budMargin=totBudRev?Math.round(grossBudProfit/totBudRev*100):0;
+  const actMargin=totActRev?Math.round(grossActProfit/totActRev*100):0;
+  const budgetUsed=totBudCost?Math.round(totActCost/totBudCost*100):0;
+  const revenueVar=totActRev-totBudRev, costVar=totActCost-totBudCost;
+
+  // KPIs
+  document.getElementById('pl-kpis').innerHTML = `
+    <div class="kcard k2"><div class="kl">Total Revenue (Actual)</div><div class="kv" style="font-size:20px">${fmtINR(totActRev)}</div><div class="kd ${revenueVar>=0?'ku':'kdn'}">${revenueVar>=0?'↑':'↓'} vs Budget: ${fmtINR(Math.abs(revenueVar))}</div></div>
+    <div class="kcard k4"><div class="kl">Total Cost (Actual)</div><div class="kv" style="font-size:20px">${fmtINR(totActCost)}</div><div class="kd ${costVar<=0?'ku':'kdn'}">${costVar>0?'↑ Over':'↓ Under'} by ${fmtINR(Math.abs(costVar))}</div></div>
+    <div class="kcard k1"><div class="kl">Gross Profit (Actual)</div><div class="kv" style="font-size:20px;color:${grossActProfit>=0?'var(--green)':'var(--red)'}">${fmtINR(grossActProfit)}</div><div class="kd ${grossActProfit>=0?'ku':'kdn'}">${grossActProfit>=0?'Profitable':'Loss-making'}</div></div>
+    <div class="kcard k3"><div class="kl">Net Margin (Actual)</div><div class="kv" style="font-size:20px;color:${actMargin>=0?'var(--green)':'var(--red)'}">${actMargin}%</div><div class="kd kfl">Budget target: ${budMargin}%</div></div>
+    <div class="kcard k5"><div class="kl">Budget Utilization</div><div class="kv" style="font-size:20px;color:${budgetUsed>100?'var(--red)':budgetUsed>85?'var(--amber)':'var(--green)'}">${budgetUsed}%</div><div class="kd ${budgetUsed>100?'kdn':budgetUsed>85?'kfl':'ku'}">${budgetUsed>100?'Over budget':budgetUsed>85?'Watch carefully':'Healthy spend'}</div></div>
+  `;
+
+  // P&L Summary
+  document.getElementById('pl-summary').innerHTML = `
+    <div class="pl-section-row"><span class="pl-sec-lbl">Revenue (Budget)</span><span class="pl-sec-val">${fmtINR(totBudRev)}</span></div>
+    <div class="pl-section-row"><span class="pl-sec-lbl">Revenue (Actual)</span><span class="pl-sec-val" style="color:var(--teal)">${fmtINR(totActRev)}</span></div>
+    <div class="pl-section-row"><span class="pl-sec-lbl">Revenue (Forecast)</span><span class="pl-sec-val" style="color:var(--amber)">${fmtINR(totFcstRev)}</span></div>
+    <div class="pl-divider"></div>
+    <div class="pl-section-row"><span class="pl-sec-lbl">Cost (Budget)</span><span class="pl-sec-val">${fmtINR(totBudCost)}</span></div>
+    <div class="pl-section-row"><span class="pl-sec-lbl">Cost (Actual)</span><span class="pl-sec-val" style="color:${totActCost>totBudCost?'var(--red)':'var(--teal)'}">${fmtINR(totActCost)}</span></div>
+    <div class="pl-section-row"><span class="pl-sec-lbl">Cost (Forecast)</span><span class="pl-sec-val" style="color:var(--amber)">${fmtINR(totFcstCost)}</span></div>
+    <div class="pl-divider"></div>
+    <div class="pl-total-row" style="color:${grossActProfit>=0?'var(--green)':'var(--red)'}"><span>Net Profit (Actual)</span><span>${fmtINR(grossActProfit)}</span></div>
+    <div class="pl-total-row" style="color:var(--amber);font-size:12px"><span>Net Profit (Forecast)</span><span>${fmtINR(grossFcstProfit)}</span></div>
+    ${entries.length===0?'<div style="font-size:11px;color:var(--ink4);margin-top:8px;text-align:center">Add entries to see your P&L populate</div>':''}
+  `;
+
+  // Category breakdowns
+  const cats = ['Labour','Infrastructure','Licensing','Services','Consulting','Sales','Other'];
+  const catColors = {'Labour':'var(--rose)','Infrastructure':'var(--violet)','Licensing':'var(--teal)','Services':'var(--amber)','Consulting':'var(--blue,#1a4a8a)','Sales':'var(--green)','Other':'var(--ink4)'};
+
+  function catBreakdown(type, containerId){
+    const filtered = entries.filter(e=>e.type===type);
+    const bycat = cats.map(c=>({ cat:c, budget:filtered.filter(e=>e.cat===c).reduce((a,e)=>a+e.budget,0), actual:filtered.filter(e=>e.cat===c).reduce((a,e)=>a+e.actual,0) })).filter(x=>x.budget||x.actual);
+    const total = bycat.reduce((a,x)=>a+x.actual,0)||1;
+    document.getElementById(containerId).innerHTML = bycat.length ? bycat.map(x=>{
+      const pct=Math.round(x.actual/total*100);
+      return `<div style="margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;margin-bottom:3px">
+          <span style="color:var(--ink2)">${x.cat}</span>
+          <span style="color:${catColors[x.cat]}">${fmtINR(x.actual)} <span style="color:var(--ink4);font-weight:400">(${pct}%)</span></span>
+        </div>
+        <div class="pgt"><div class="pgf" style="width:${pct}%;background:${catColors[x.cat]}"></div></div>
+      </div>`;
+    }).join('') : `<div class="empty" style="padding:10px"><h3>No ${type} entries</h3><p>Add entries to see breakdown</p></div>`;
+  }
+  catBreakdown('Revenue','pl-rev-breakdown');
+  catBreakdown('Cost','pl-cost-breakdown');
+
+  // Bar chart — by period
+  const periods = [...new Set(entries.map(e=>e.period||'Unset'))].filter(Boolean);
+  if(periods.length){
+    const maxV = Math.max(...periods.map(pr=>{
+      const ents = entries.filter(e=>(e.period||'Unset')===pr);
+      return Math.max(ents.reduce((a,e)=>a+e.budget,0), ents.reduce((a,e)=>a+e.actual,0), ents.reduce((a,e)=>a+e.forecast,0));
+    }), 1);
+    document.getElementById('pl-chart').innerHTML = periods.map(pr=>{
+      const ents = entries.filter(e=>(e.period||'Unset')===pr);
+      const bud=ents.reduce((a,e)=>a+e.budget,0);
+      const act=ents.reduce((a,e)=>a+e.actual,0);
+      const fcs=ents.reduce((a,e)=>a+e.forecast,0);
+      const h=(v)=>Math.max(4,Math.round(v/maxV*140));
+      return `<div class="pl-bar-group">
+        <div class="pl-bar-wrap">
+          <div class="pl-bar" style="height:${h(bud)}px;width:16px;background:var(--violet);opacity:.7" data-tip="Budget: ${fmtINR(bud)}"></div>
+          <div class="pl-bar" style="height:${h(act)}px;width:16px;background:var(--teal)" data-tip="Actual: ${fmtINR(act)}"></div>
+          <div class="pl-bar" style="height:${h(fcs)}px;width:16px;background:var(--amber);opacity:.8" data-tip="Forecast: ${fmtINR(fcs)}"></div>
+        </div>
+      </div>`;
+    }).join('');
+    document.getElementById('pl-chart-lbls').innerHTML = periods.map(pr=>`<div class="pl-lbl" style="flex:1;min-width:48px">${pr}</div>`).join('');
+  } else {
+    document.getElementById('pl-chart').innerHTML='<div class="empty" style="width:100%;justify-content:center"><p style="font-size:12px;color:var(--ink4)">Set a period on entries to see the chart</p></div>';
+    document.getElementById('pl-chart-lbls').innerHTML='';
+  }
+
+  // Filter + table
+  let filtered = entries;
+  if(typeF) filtered=filtered.filter(e=>e.type===typeF);
+  if(catF) filtered=filtered.filter(e=>e.cat===catF);
+  const statTag={'Planned':'tink','Committed':'tvio','Actual':'tgrn','Overrun':'tred'};
+  document.getElementById('pl-tbody').innerHTML = filtered.length ? filtered.map(e=>{
+    const varAmt = e.actual - e.budget;
+    const varClass = varAmt > 0 && e.type==='Cost' ? 'pl-var-neg' : varAmt < 0 && e.type==='Revenue' ? 'pl-var-neg' : varAmt !== 0 ? 'pl-var-pos' : '';
+    const varSign = varAmt>0?'+':'';
+    return `<tr>
+      <td><span class="tag ${e.type==='Revenue'?'tgrn':'tred'}">${e.type}</span><br/><span style="font-size:10px;color:var(--ink4)">${e.cat}</span></td>
+      <td><div class="tn" style="font-size:12px">${e.desc}</div><div class="ts">${e.owner||'—'}</div></td>
+      <td><span class="tag ${e.type==='Revenue'?'tgrn':'tred'}" style="font-size:9px">${e.type}</span></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink4)">${e.period||'—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${fmtINR(e.budget)}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700">${fmtINR(e.actual)}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber)">${fmtINR(e.forecast)}</td>
+      <td class="${varClass}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${varSign}${fmtINR(varAmt)}</td>
+      <td><span class="tag ${statTag[e.status]||'tink'}">${e.status}</span></td>
+      <td><div style="display:flex;gap:3px">
+        <button class="btn btn-ghost btn-xs" onclick="openPLEntryModal('${e.id}')">Edit</button>
+        <button class="btn btn-danger btn-xs" onclick="delPLEntry('${e.id}')">Del</button>
+      </div></td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--ink4)">No entries yet. <a href="#" onclick="openPLEntryModal()" style="color:var(--rose)">Add your first P&L entry →</a></td></tr>`;
 }
 
 /* ══════════════════════════════

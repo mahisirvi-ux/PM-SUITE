@@ -30,13 +30,14 @@ async function loadInitialData() {
 
 async function loadProjectData(pid) {
   try {
-    const [t, r, res, m] = await Promise.all([
+    const [t, r, res, m, pl] = await Promise.all([
       fetch(`${API_BASE}/tasks/${pid}`).then(x => x.json()),
       fetch(`${API_BASE}/risks/${pid}`).then(x => x.json()),
       fetch(`${API_BASE}/resources/${pid}`).then(x => x.json()),
-      fetch(`${API_BASE}/milestones/${pid}`).then(x => x.json())
+      fetch(`${API_BASE}/milestones/${pid}`).then(x => x.json()),
+      fetch(`${API_BASE}/pl/${pid}`).then(x => x.json())
     ]);
-    state.tasks = t; state.risks = r; state.resources = res; state.milestones = m;
+    state.tasks = t; state.risks = r; state.resources = res; state.milestones = m; state.pl = pl;
   } catch (e) {
     toast('Error loading project data', 'err');
   }
@@ -248,4 +249,31 @@ async function callAI(msg){
     appendMsg('bot', 'Connection error. Make sure your FastAPI server is running!'); 
     console.error(e);
   }
+}
+
+/* --- P&L CRUD --- */
+async function savePLEntry(){
+    if(!curPid){ toast('Select a project first','err'); return; }
+    const desc = document.getElementById('mpl-desc').value.trim();
+    if(!desc){ toast('Description required','err'); return; }
+    
+    const entry = {
+        id: document.getElementById('mpl-id').value || uid(), pid:curPid,
+        type: document.getElementById('mpl-type').value, cat: document.getElementById('mpl-cat').value,
+        desc, period: document.getElementById('mpl-period').value, status: document.getElementById('mpl-status').value,
+        budget: parseFloat(document.getElementById('mpl-budget').value)||0,
+        actual: parseFloat(document.getElementById('mpl-actual').value)||0,
+        forecast: parseFloat(document.getElementById('mpl-forecast').value)||0,
+        owner: document.getElementById('mpl-owner').value, notes: document.getElementById('mpl-notes').value,
+        updatedAt: Date.now()
+    };
+    
+    await fetch(`${API_BASE}/pl`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry) });
+    await loadProjectData(curPid); closeM('m-pl'); refresh(); toast('P&L Entry saved ✓');
+}
+
+async function delPLEntry(id){ 
+    if(!confirm('Delete this P&L entry?')) return; 
+    await fetch(`${API_BASE}/pl/${id}`, { method: 'DELETE' });
+    await loadProjectData(curPid); refresh(); toast('Entry deleted'); 
 }

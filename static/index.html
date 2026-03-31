@@ -42,6 +42,7 @@
   <div class="ni" data-tab="risks"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>Risk Register<span class="nbadge hot" id="badge-risks2">0</span></div>
   <div class="ni" data-tab="resources"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Resources</div>
   <div class="ni" data-tab="delivery"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Milestones</div>
+  <div class="ni" data-tab="pl"><svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>Profit & Loss</div>
   <div class="ni" data-tab="import"><svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2z"/></svg>Import / Export</div>
   <div class="sb-bot">
     <div class="agent-st">
@@ -134,25 +135,28 @@
     <button class="atab" onclick="setAgent('resource',this)"><svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>Resource</button>
     <button class="atab" onclick="setAgent('delivery',this)"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Delivery</button>
   </div>
-  <div class="clayout">
-    <div class="chat-shell">
+  <div class="clayout" style="height: calc(100vh - 210px); display: grid; grid-template-columns: 1fr 250px; gap: 14px; overflow: hidden;">
+    
+    <div class="chat-shell" style="height: 100%; display: flex; flex-direction: column; overflow: hidden;">
       <div class="chat-hdr">
         <div class="aav" id="a-av" style="background:linear-gradient(135deg,var(--rose),var(--violet))"><svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg></div>
         <div class="ainf"><h4 id="a-title">Planner Agent</h4><p id="a-desc">Sprint planning · backlog · estimation</p></div>
         <div class="aonl"><div class="aonl-dot"></div>online</div>
       </div>
       <div class="chips" id="chips"></div>
-      <div id="msgs"></div>
+      <div id="msgs" style="flex: 1; overflow-y: auto;"></div>
       <div class="chat-foot">
         <textarea class="cta" id="cta" placeholder="Ask anything — agents use your live project data…" rows="1"></textarea>
         <button class="sbtn" onclick="sendMsg()"><svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
       </div>
     </div>
-    <div class="cside">
+
+    <div class="cside" style="height: 100%; overflow-y: auto; padding-right: 8px; padding-bottom: 20px;">
       <div class="cscard"><div class="cshdr"><span>Project Data</span></div><div class="csbody" id="cs-proj"></div></div>
       <div class="cscard"><div class="cshdr"><span>Blockers</span></div><div class="csbody" id="cs-block" style="display:flex;flex-direction:column;gap:6px"></div></div>
       <div class="cscard"><div class="cshdr"><span>Team</span></div><div class="csbody" id="cs-team" style="display:flex;flex-direction:column;gap:4px"></div></div>
     </div>
+
   </div>
 </div>
 
@@ -198,6 +202,51 @@
   <div style="display:grid;grid-template-columns:300px 1fr;gap:14px">
     <div class="card"><div class="ch"><span class="ch-t">Timeline</span></div><div class="cb"><div class="mtl"><div class="mtl-line"></div><div id="ms-list"></div></div></div></div>
     <div class="card"><div class="ch"><span class="ch-t">Task Breakdown</span></div><div class="cb" id="del-breakdown"></div></div>
+  </div>
+</div>
+
+<div class="panel" id="p-pl">
+  <div class="ph">
+    <div class="ph-l"><div class="eye">Financials</div><div class="ttl">Profit & Loss</div><div class="sub" id="pl-sub">Project Financial Dashboard</div></div>
+    <div class="ph-r"><button class="btn btn-ink" onclick="openPLEntryModal()"><svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Add Entry</button></div>
+  </div>
+  <div class="krow" id="pl-kpis" style="margin-bottom: 24px;"></div>
+  
+  <div style="display:grid;grid-template-columns:2.5fr 1fr;gap:20px;margin-bottom:20px">
+    
+    <div class="card">
+      <div class="ch" style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="ch-t" style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">Budget vs Actuals vs Forecast</span>
+        <div style="display:flex;gap:12px;font-size:11px;font-weight:700;color:var(--ink3)">
+          <span style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;background:var(--violet);border-radius:2px"></div>Budget</span>
+          <span style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;background:var(--teal);border-radius:2px"></div>Actual</span>
+          <span style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;background:var(--amber);border-radius:2px"></div>Forecast</span>
+        </div>
+      </div>
+      <div class="cb" style="padding:20px;display:flex;flex-direction:column;height:280px">
+        <div id="pl-chart" style="flex:1;display:flex;align-items:flex-end;gap:40px;padding-bottom:10px;border-bottom:1px solid var(--b2)"></div>
+        <div id="pl-chart-lbls" style="display:flex;gap:40px;margin-top:10px"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="ch"><span class="ch-t" style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">P&L Summary</span></div>
+      <div class="cb" id="pl-summary" style="padding:20px"></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="card"><div class="ch"><span class="ch-t" style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">Revenue Breakdown</span></div><div class="cb" id="pl-rev-breakdown" style="padding:20px"></div></div>
+    <div class="card"><div class="ch"><span class="ch-t" style="font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">Cost Breakdown</span></div><div class="cb" id="pl-cost-breakdown" style="padding:20px"></div></div>
+  </div>	
+  <div class="card" style="margin-top:14px">
+    <div class="ch"><span class="ch-t">Ledger Entries</span>
+      <div style="display:flex; gap:8px;">
+        <select id="pl-filter-type" onchange="renderPL()" style="border:1px solid var(--b2);border-radius:6px;padding:4px"><option value="">All Types</option><option>Revenue</option><option>Cost</option></select>
+        <select id="pl-filter-cat" onchange="renderPL()" style="border:1px solid var(--b2);border-radius:6px;padding:4px"><option value="">All Categories</option><option>Labour</option><option>Infrastructure</option><option>Licensing</option><option>Services</option></select>
+      </div>
+    </div>
+    <div style="overflow-x:auto"><table class="t"><thead><tr><th>Type</th><th>Description</th><th>Tag</th><th>Period</th><th>Budget</th><th>Actual</th><th>Forecast</th><th>Variance</th><th>Status</th><th>Actions</th></tr></thead><tbody id="pl-tbody"></tbody></table></div>
   </div>
 </div>
 
@@ -401,12 +450,38 @@
   <div class="mfoot"><button class="btn btn-ghost" onclick="closeM('m-ms')">Cancel</button><button class="btn btn-ink" onclick="saveMs()">Save Milestone</button></div>
 </div></div>
 
+<div class="mbg" id="m-pl"><div class="modal">
+  <div class="mhdr"><h3 id="mpl-ttl">Add P&L Entry</h3><button class="mx" onclick="closeM('m-pl')">×</button></div>
+  <div class="mbody">
+    <input type="hidden" id="mpl-id"/>
+    <div class="fg"><label>Description *</label><input id="mpl-desc" placeholder="e.g. Q3 AWS Hosting"/></div>
+    <div class="fg-2">
+      <div class="fg"><label>Type</label><select id="mpl-type"><option>Cost</option><option>Revenue</option></select></div>
+      <div class="fg"><label>Category</label><select id="mpl-cat"><option>Labour</option><option>Infrastructure</option><option>Licensing</option><option>Services</option><option>Consulting</option><option>Sales</option><option>Other</option></select></div>
+    </div>
+    <div class="fg-2">
+      <div class="fg"><label>Period</label><input id="mpl-period" placeholder="e.g. 2026-Q3"/></div>
+      <div class="fg"><label>Status</label><select id="mpl-status"><option>Planned</option><option>Committed</option><option>Actual</option><option>Overrun</option></select></div>
+    </div>
+    <div class="fg-2">
+      <div class="fg"><label>Budget (₹)</label><input id="mpl-budget" type="number" value="0"/></div>
+      <div class="fg"><label>Actual (₹)</label><input id="mpl-actual" type="number" value="0"/></div>
+    </div>
+    <div class="fg-2">
+      <div class="fg"><label>Forecast (₹)</label><input id="mpl-forecast" type="number" value="0"/></div>
+      <div class="fg"><label>Owner</label><input id="mpl-owner" placeholder="Owner Name"/></div>
+    </div>
+    <div class="fg"><label>Notes</label><textarea id="mpl-notes" rows="2"></textarea></div>
+  </div>
+  <div class="mfoot"><button class="btn btn-ghost" onclick="closeM('m-pl')">Cancel</button><button class="btn btn-ink" onclick="savePLEntry()">Save Entry</button></div>
+</div></div>
+
 <div id="toast"></div>
   <script src="/static/js/config.js"></script>
-  <script src="/static/js/state.js"></script>
+  <script src="/static/js/state.js?v=2"></script>
   <script src="/static/js/prompts.js"></script>
-  <script src="/static/js/api.js"></script>
-  <script src="/static/js/ui.js"></script>
+  <script src="/static/js/api.js?v=2"></script>
+  <script src="/static/js/ui.js?v=2"></script>
   <script src="/static/js/agents.js"></script>
   <script src="/static/js/app.js"></script>
 

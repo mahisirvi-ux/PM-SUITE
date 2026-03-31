@@ -246,9 +246,10 @@ body{font-family:'Cabinet Grotesk',sans-serif;background:var(--bg);color:var(--i
 .atab svg{width:13px;height:13px;fill:currentColor;}
 .atab:hover{border-color:var(--rose);color:var(--rose);}
 .atab.on{background:var(--ink);color:#fff;border-color:var(--ink);}
-.clayout{display:grid;grid-template-columns:1fr 250px;gap:14px;height:calc(100vh - 52px - 64px - 48px);}
-.cside{display:flex;flex-direction:column;gap:11px;overflow-y:auto;}
-.cside::-webkit-scrollbar{display:none;}
+.clayout {display: grid;grid-template-columns: 1fr 250px;gap: 14px;height: calc(100vh - 180px);min-height: 0; }
+.cside {display: flex;flex-direction: column;gap: 11px;overflow-y: auto;height: 100%;min-height: 0; padding-right: 6px;padding-bottom: 20px;}
+.cside::-webkit-scrollbar {width: 6px !important;display: block !important; }
+.cside::-webkit-scrollbar-thumb {background: #cdd0df !important;border-radius: 4px !important;}
 .cscard{background:var(--surface);border:1px solid var(--b);border-radius:var(--r2);overflow:hidden;box-shadow:var(--sh);}
 .cshdr{padding:9px 13px;background:var(--ink);}
 .cshdr span{font-size:10px;font-weight:800;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.08em;font-family:'JetBrains Mono',monospace;}
@@ -282,3 +283,17 @@ pre{background:var(--surface2);border:1px solid var(--b);border-radius:8px;paddi
 
 ::-webkit-scrollbar{width:5px;height:5px;}
 ::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px;}
+/* Stop the sidebar cards from squishing! */
+.cscard {flex-shrink: 0 !important;}
+
+/* P&L Module Styles */
+.pl-section-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; font-weight: 600; color: var(--ink2); }
+.pl-sec-val { font-family: 'JetBrains Mono', monospace; }
+.pl-divider { height: 1px; background: var(--b); margin: 8px 0; }
+.pl-total-row { display: flex; justify-content: space-between; font-weight: 800; font-size: 15px; padding-top: 6px; font-family: 'JetBrains Mono', monospace;}
+.pl-var-neg { color: var(--red); font-weight: bold; }
+.pl-var-pos { color: var(--green); font-weight: bold; }
+.pl-bar-group { display: flex; align-items: flex-end; justify-content: center; flex: 1; height: 100%;}
+.pl-bar-wrap { display: flex; gap: 2px; align-items: flex-end; }
+.pl-bar { border-radius: 3px 3px 0 0; transition: height 0.3s ease; }
+.pl-lbl { text-align: center; font-size: 10px; color: var(--ink4); font-weight: 600;}

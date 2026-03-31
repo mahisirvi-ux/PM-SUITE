@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from sqlalchemy import create_engine, Column, String, Integer, Text, ForeignKey, BigInteger
+from sqlalchemy import create_engine, Column, String, Integer, Float, Text, ForeignKey, BigInteger
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 from sqlalchemy.dialects.postgresql import ARRAY
 from pydantic import BaseModel
@@ -55,6 +55,22 @@ class DBTask(Base):
     notes = Column(Text)
     updatedAt = Column(BigInteger)
 
+class DBPL(Base):
+    __tablename__ = "pl_entries"
+    id = Column(String, primary_key=True, index=True)
+    pid = Column(String, ForeignKey("projects.id", ondelete="CASCADE"))
+    type = Column(String)
+    cat = Column(String)
+    desc = Column(String, nullable=False)
+    period = Column(String)
+    status = Column(String)
+    budget = Column(Float)
+    actual = Column(Float)
+    forecast = Column(Float)
+    owner = Column(String)
+    notes = Column(Text)
+    updatedAt = Column(BigInteger)
+
 class DBRisk(Base):
     __tablename__ = "risks"
     id = Column(String, primary_key=True, index=True)
@@ -103,6 +119,21 @@ class TaskSchema(BaseModel):
     id: str; pid: str; name: str; ticket: Optional[str] = None; comp: Optional[str] = None
     assignee: Optional[str] = None; sprint: int; sp: int; prio: str; status: str
     prog: int; start: Optional[str] = None; end: Optional[str] = None; notes: Optional[str] = None; updatedAt: int
+
+class DBPLEntry(BaseModel):
+    id: str
+    pid: str
+    type: str
+    cat: str
+    desc: str
+    period: str
+    status: str
+    budget: float
+    actual: float
+    forecast: float
+    owner: str
+    notes: str
+    updatedAt: int
 
 class ChatRequest(BaseModel):
     agent: str
@@ -418,3 +449,25 @@ async def import_data(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+    
+# P&L Entries
+@app.get("/pl/{pid}", response_model=List[dict])
+def read_pl(pid: str, db: Session = Depends(get_db)):
+    entries = db.query(DBPL).filter(DBPL.pid == pid).all()
+    return [{k: v for k, v in e.__dict__.items() if not k.startswith("_")} for e in entries]
+
+@app.post("/pl")
+def save_pl(entry: dict, db: Session = Depends(get_db)):
+    db_entry = db.query(DBPL).filter(DBPL.id == entry['id']).first()
+    if db_entry:
+        for k, v in entry.items(): setattr(db_entry, k, v)
+    else:
+        db.add(DBPL(**entry))
+    db.commit()
+    return {"status": "success"}
+
+@app.delete("/pl/{id}")
+def delete_pl(id: str, db: Session = Depends(get_db)):
+    db.query(DBPL).filter(DBPL.id == id).delete()
+    db.commit()
+    return {"status": "deleted"}
