@@ -475,12 +475,13 @@ function renderPL(){
   const revenueVar=totActRev-totBudRev, costVar=totActCost-totBudCost;
 
   // KPIs
+
   document.getElementById('pl-kpis').innerHTML = `
-    <div class="kcard k2"><div class="kl">Total Revenue (Actual)</div><div class="kv" style="font-size:20px">${fmtINR(totActRev)}</div><div class="kd ${revenueVar>=0?'ku':'kdn'}">${revenueVar>=0?'↑':'↓'} vs Budget: ${fmtINR(Math.abs(revenueVar))}</div></div>
-    <div class="kcard k4"><div class="kl">Total Cost (Actual)</div><div class="kv" style="font-size:20px">${fmtINR(totActCost)}</div><div class="kd ${costVar<=0?'ku':'kdn'}">${costVar>0?'↑ Over':'↓ Under'} by ${fmtINR(Math.abs(costVar))}</div></div>
-    <div class="kcard k1"><div class="kl">Gross Profit (Actual)</div><div class="kv" style="font-size:20px;color:${grossActProfit>=0?'var(--green)':'var(--red)'}">${fmtINR(grossActProfit)}</div><div class="kd ${grossActProfit>=0?'ku':'kdn'}">${grossActProfit>=0?'Profitable':'Loss-making'}</div></div>
-    <div class="kcard k3"><div class="kl">Net Margin (Actual)</div><div class="kv" style="font-size:20px;color:${actMargin>=0?'var(--green)':'var(--red)'}">${actMargin}%</div><div class="kd kfl">Budget target: ${budMargin}%</div></div>
-    <div class="kcard k5"><div class="kl">Budget Utilization</div><div class="kv" style="font-size:20px;color:${budgetUsed>100?'var(--red)':budgetUsed>85?'var(--amber)':'var(--green)'}">${budgetUsed}%</div><div class="kd ${budgetUsed>100?'kdn':budgetUsed>85?'kfl':'ku'}">${budgetUsed>100?'Over budget':budgetUsed>85?'Watch carefully':'Healthy spend'}</div></div>
+    <div class="kcard" style="border-top:3px solid var(--teal);padding:18px"><div class="kl" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">Total Revenue (Actual)</div><div class="kv" style="font-size:26px;font-weight:800;margin:8px 0">${fmtINR(totActRev)}</div><div class="kd ${revenueVar>=0?'ku':'kdn'}">${revenueVar>=0?'↑':'↓'} vs Budget: ${fmtINR(Math.abs(revenueVar))}</div></div>
+    <div class="kcard" style="border-top:3px solid var(--red);padding:18px"><div class="kl" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">Total Cost (Actual)</div><div class="kv" style="font-size:26px;font-weight:800;margin:8px 0">${fmtINR(totActCost)}</div><div class="kd ${costVar<=0?'ku':'kdn'}">${costVar>0?'↑ Over by':'↓ Under by'} ${fmtINR(Math.abs(costVar))}</div></div>
+    <div class="kcard" style="border-top:3px solid var(--violet);padding:18px"><div class="kl" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">Gross Profit (Actual)</div><div class="kv" style="font-size:26px;font-weight:800;margin:8px 0;color:${grossActProfit>=0?'var(--green)':'var(--red)'}">${fmtINR(grossActProfit)}</div><div class="kd ${grossActProfit>=0?'ku':'kdn'}">${grossActProfit>=0?'Profitable':'Loss-making'}</div></div>
+    <div class="kcard" style="border-top:3px solid var(--amber);padding:18px"><div class="kl" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">Net Margin (Actual)</div><div class="kv" style="font-size:26px;font-weight:800;margin:8px 0;color:${actMargin>=0?'var(--green)':'var(--red)'}">${actMargin}%</div><div class="kd kfl">Budget target: ${budMargin}%</div></div>
+    <div class="kcard" style="border-top:3px solid #6366f1;padding:18px"><div class="kl" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">Budget Utilization</div><div class="kv" style="font-size:26px;font-weight:800;margin:8px 0;color:${budgetUsed>100?'var(--red)':budgetUsed>85?'var(--amber)':'var(--teal)'}">${budgetUsed}%</div><div class="kd ${budgetUsed>100?'kdn':budgetUsed>85?'kfl':'ku'}">${budgetUsed>100?'Over budget':budgetUsed>85?'Watch carefully':'Healthy spend'}</div></div>
   `;
 
   // P&L Summary
@@ -532,7 +533,7 @@ function renderPL(){
       const bud=ents.reduce((a,e)=>a+e.budget,0);
       const act=ents.reduce((a,e)=>a+e.actual,0);
       const fcs=ents.reduce((a,e)=>a+e.forecast,0);
-      const h=(v)=>Math.max(4,Math.round(v/maxV*140));
+      const h=(v)=>Math.max(4,Math.round(v/maxV*220));
       return `<div class="pl-bar-group">
         <div class="pl-bar-wrap">
           <div class="pl-bar" style="height:${h(bud)}px;width:16px;background:var(--violet);opacity:.7" data-tip="Budget: ${fmtINR(bud)}"></div>
@@ -541,7 +542,7 @@ function renderPL(){
         </div>
       </div>`;
     }).join('');
-    document.getElementById('pl-chart-lbls').innerHTML = periods.map(pr=>`<div class="pl-lbl" style="flex:1;min-width:48px">${pr}</div>`).join('');
+    document.getElementById('pl-chart-lbls').innerHTML = periods.map(pr=>`<div class="pl-lbl" style="flex:1;min-width:74px">${pr}</div>`).join('');
   } else {
     document.getElementById('pl-chart').innerHTML='<div class="empty" style="width:100%;justify-content:center"><p style="font-size:12px;color:var(--ink4)">Set a period on entries to see the chart</p></div>';
     document.getElementById('pl-chart-lbls').innerHTML='';

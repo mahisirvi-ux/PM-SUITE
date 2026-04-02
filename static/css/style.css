@@ -286,14 +286,18 @@ pre{background:var(--surface2);border:1px solid var(--b);border-radius:8px;paddi
 /* Stop the sidebar cards from squishing! */
 .cscard {flex-shrink: 0 !important;}
 
-/* P&L Module Styles */
-.pl-section-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; font-weight: 600; color: var(--ink2); }
-.pl-sec-val { font-family: 'JetBrains Mono', monospace; }
-.pl-divider { height: 1px; background: var(--b); margin: 8px 0; }
-.pl-total-row { display: flex; justify-content: space-between; font-weight: 800; font-size: 15px; padding-top: 6px; font-family: 'JetBrains Mono', monospace;}
-.pl-var-neg { color: var(--red); font-weight: bold; }
-.pl-var-pos { color: var(--green); font-weight: bold; }
-.pl-bar-group { display: flex; align-items: flex-end; justify-content: center; flex: 1; height: 100%;}
-.pl-bar-wrap { display: flex; gap: 2px; align-items: flex-end; }
-.pl-bar { border-radius: 3px 3px 0 0; transition: height 0.3s ease; }
-.pl-lbl { text-align: center; font-size: 10px; color: var(--ink4); font-weight: 600;}
+
+/* ══════════════════════════════
+   P&L DASHBOARD STYLES 
+══════════════════════════════ */
+.pl-section-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; font-size: 13px; font-weight: 500; color: var(--ink2); }
+.pl-sec-lbl { color: var(--ink3); }
+.pl-sec-val { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--ink); font-size: 14px;}
+.pl-divider { height: 1px; background: var(--b2); margin: 12px 0; }
+.pl-total-row { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 15px; padding-top: 10px; font-family: 'Cabinet Grotesk', sans-serif;}
+
+/* Chart specific fixes to stop them stacking! */
+.pl-bar-group { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;}
+.pl-bar-wrap { display: flex; gap: 4px; align-items: flex-end; height: 100%; }
+.pl-bar { border-radius: 4px 4px 0 0; width: 22px; transition: height 0.4s ease; }
+.pl-lbl { text-align: center; font-size: 11px; color: var(--ink4); font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;}

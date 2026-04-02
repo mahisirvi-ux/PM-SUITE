@@ -21,7 +21,8 @@ let hist = {
     planner: [], 
     risk: [], 
     resource: [], 
-    delivery: [] 
+    delivery: [],
+    finance: []
 };
 
 // 4. Global Getters
