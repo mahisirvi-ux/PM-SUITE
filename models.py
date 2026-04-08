@@ -5,6 +5,15 @@ from typing import Optional, List
 from database import Base, engine
     
 # --- SQLALCHEMY MODELS ---
+class DBUsers(Base):
+    __tablename__ = "users"
+    id = Column(String, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    role = Column(String, default="member")
+    id_active = Column(Integer, default=1)
+
 class DBProject(Base):
     __tablename__ = "projects"
     id = Column(String, primary_key=True, index=True)
@@ -120,3 +129,18 @@ class ChatRequest(BaseModel):
     message: str
     context: str
     history: list = []
+
+class UserCreate(BaseModel):
+    email: str
+    password: str
+    name: str
+
+class UserResponse(BaseModel):
+    id: str
+    email:str 
+    password: str
+    name: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str

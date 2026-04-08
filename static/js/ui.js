@@ -41,23 +41,45 @@ function openProjModal(id){
 }
 
 function openTaskModal(id){
-    const t = id ? getAllTasks().find(x=>x.id===id) : null;
+    const p = curProj();
+    if (!p) return; // Safety check: Ensure a project is selected
+
+    // 1. Find the task if editing (t will be null if adding a new task)
+    const t = id ? getAllTasks().find(x => x.id === id) : null;
+
+    // 2. Build the Assignee Dropdown dynamically
+    const team = pRes(p.id) || [];
+    const assigneeSelect = document.getElementById('mt-assignee'); // Using your mt- prefix!
+    
+    if (assigneeSelect) {
+        assigneeSelect.innerHTML = '<option value="">Unassigned</option>' + 
+            team.map(r => `<option value="${r.name}">${r.name}</option>`).join('');
+    }
+
+    // 3. Populate all modal fields safely
     document.getElementById('mt-ttl').textContent = t ? 'Edit Task' : 'Add Task';
     document.getElementById('mt-id').value = t?.id || '';
     document.getElementById('mt-name').value = t?.name || '';
     document.getElementById('mt-ticket').value = t?.ticket || '';
     document.getElementById('mt-comp').value = t?.comp || '';
-    document.getElementById('mt-assignee').value = t?.assignee || '';
-    document.getElementById('mt-sprint').value = t?.sprint ?? (curProj()?.sprint||1);
+    
+    // Set the dropdown value now that options exist
+    if (assigneeSelect) assigneeSelect.value = t?.assignee || '';
+    
+    document.getElementById('mt-sprint').value = t?.sprint ?? (p.sprint || 1);
     document.getElementById('mt-sp').value = t?.sp ?? 5;
     document.getElementById('mt-prio').value = t?.prio || 'Medium';
     document.getElementById('mt-stat').value = t?.status || 'To Do';
-    const pg = +t?.prog||0; 
+    
+    const pg = +(t?.prog || 0); 
     document.getElementById('mt-prog').value = pg; 
-    document.getElementById('mt-pv').textContent = pg+'%';
+    document.getElementById('mt-pv').textContent = pg + '%';
+    
     document.getElementById('mt-start').value = t?.start || '';
     document.getElementById('mt-end').value = t?.end || '';
     document.getElementById('mt-notes').value = t?.notes || '';
+    
+    // 4. Open the modal
     openM('m-task');
 }
 
@@ -317,14 +339,48 @@ function renderGantt(){
     }).join('');
 }
 
-function renderRisks(){
-    const p = curProj(); const el = document.getElementById('risk-list');
-    if(!p){ el.innerHTML='<div class="empty"><h3>No project</h3></div>'; return; }
+function renderRisks() {
+    const p = curProj(); 
+    const el = document.getElementById('risk-list');
+    
+    if(!p) { 
+        el.innerHTML='<div class="empty"><h3>No project</h3></div>'; 
+        return; 
+    }
+    
     const risks = pRisks(p.id);
-    if(!risks.length){ el.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg><h3>No risks logged</h3><p>Add risks to start tracking them.</p></div>`; return; }
+    if(!risks.length) { 
+        el.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg><h3>No risks logged</h3><p>Add risks to start tracking them.</p></div>`; 
+        return; 
+    }
+    
     const sc={Critical:'var(--red)',High:'var(--amber)',Medium:'var(--amber)',Low:'var(--teal)'};
     const sb={Critical:'var(--redd)',High:'var(--amberd)',Medium:'var(--amberd)',Low:'var(--teald)'};
-    el.innerHTML = risks.map(r=>`
+    
+    el.innerHTML = risks.map(r => {
+        
+        // --- BULLETPROOF SMART PARSER ---
+        let cleanMit = r.mit || '';
+        if (typeof cleanMit === 'string' && cleanMit.includes('[')) {
+            try {
+                // Attempt 1: Standard JSON parse
+                let parsed = JSON.parse(cleanMit.replace(/'/g, '"'));
+                if (Array.isArray(parsed)) cleanMit = parsed.join(' • ');
+            } catch (e) {
+                // Attempt 2: Brute force! Destroy all brackets and quotes.
+                cleanMit = cleanMit
+                    .replace(/[\[\]]/g, '')       // Strip [ and ]
+                    .replace(/","/g, '" • "')     // Replace commas between quotes with bullets
+                    .replace(/','/g, "' • '")     // Handle single quote commas
+                    .replace(/["']/g, '')         // Strip all remaining quotes
+                    .trim();
+            }
+        } else if (Array.isArray(cleanMit)) {
+            cleanMit = cleanMit.join(' • ');
+        }
+        // ----------------------------------------------------
+
+        return `
         <div class="rcard">
             <div style="width:34px;height:34px;border-radius:8px;background:${sb[r.sev]};color:${sc[r.sev]};display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${r.sev==='Critical'?'🔴':r.sev==='High'?'🟠':'🟡'}</div>
             <div style="flex:1">
@@ -341,9 +397,10 @@ function renderRisks(){
                         <button class="btn btn-danger btn-xs" onclick="delRisk('${r.id}')">Del</button>
                     </div>
                 </div>
-                ${r.mit?`<div style="margin-top:7px;font-size:11px;color:var(--green);background:var(--greend);border-radius:5px;padding:5px 9px">💡 ${r.mit}</div>`:''}
+                ${cleanMit ? `<div style="margin-top:7px;font-size:11px;color:var(--green);background:var(--greend);border-radius:5px;padding:5px 9px;line-height:1.6">💡 ${cleanMit}</div>` : ''}
             </div>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 }
 
 function renderResources(){
@@ -451,31 +508,23 @@ function openPLEntryModal(id){
   openM('m-pl');
 }
 
-function renderPL(){
+function renderPL() {
   const p = curProj();
-  if(!p){
+  const dash = getPLDashboard();
+  let entries = pPL(p?.id);
+
+  if (!p || !dash) {
     ['pl-kpis','pl-tbody','pl-chart','pl-chart-lbls','pl-summary','pl-rev-breakdown','pl-cost-breakdown'].forEach(id=>{
       const el=document.getElementById(id); if(el) el.innerHTML='<div class="empty" style="grid-column:1/-1"><h3>No project selected</h3></div>';
     }); return;
   }
+
   document.getElementById('pl-sub').textContent = `${p.name} · Financial Dashboard`;
-  const typeF = document.getElementById('pl-filter-type')?.value||'';
-  const catF = document.getElementById('pl-filter-cat')?.value||'';
-  let entries = pPL(p.id);
+  
+  // 1. Unpack the math Python did for us
+  const { totBudRev, totActRev, totFcstRev, totBudCost, totActCost, totFcstCost, grossActProfit, grossFcstProfit, actMargin, budMargin, budgetUsed, revenueVar, costVar } = dash.totals;
 
-  // totals
-  const rev = entries.filter(e=>e.type==='Revenue');
-  const cost = entries.filter(e=>e.type==='Cost');
-  const totBudRev=rev.reduce((a,e)=>a+e.budget,0), totActRev=rev.reduce((a,e)=>a+e.actual,0), totFcstRev=rev.reduce((a,e)=>a+e.forecast,0);
-  const totBudCost=cost.reduce((a,e)=>a+e.budget,0), totActCost=cost.reduce((a,e)=>a+e.actual,0), totFcstCost=cost.reduce((a,e)=>a+e.forecast,0);
-  const grossBudProfit=totBudRev-totBudCost, grossActProfit=totActRev-totActCost, grossFcstProfit=totFcstRev-totFcstCost;
-  const budMargin=totBudRev?Math.round(grossBudProfit/totBudRev*100):0;
-  const actMargin=totActRev?Math.round(grossActProfit/totActRev*100):0;
-  const budgetUsed=totBudCost?Math.round(totActCost/totBudCost*100):0;
-  const revenueVar=totActRev-totBudRev, costVar=totActCost-totBudCost;
-
-  // KPIs
-
+  // 2. Render KPIs
   document.getElementById('pl-kpis').innerHTML = `
     <div class="kcard" style="border-top:3px solid var(--teal);padding:18px"><div class="kl" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">Total Revenue (Actual)</div><div class="kv" style="font-size:26px;font-weight:800;margin:8px 0">${fmtINR(totActRev)}</div><div class="kd ${revenueVar>=0?'ku':'kdn'}">${revenueVar>=0?'↑':'↓'} vs Budget: ${fmtINR(Math.abs(revenueVar))}</div></div>
     <div class="kcard" style="border-top:3px solid var(--red);padding:18px"><div class="kl" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">Total Cost (Actual)</div><div class="kv" style="font-size:26px;font-weight:800;margin:8px 0">${fmtINR(totActCost)}</div><div class="kd ${costVar<=0?'ku':'kdn'}">${costVar>0?'↑ Over by':'↓ Under by'} ${fmtINR(Math.abs(costVar))}</div></div>
@@ -484,7 +533,7 @@ function renderPL(){
     <div class="kcard" style="border-top:3px solid #6366f1;padding:18px"><div class="kl" style="font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--ink4)">Budget Utilization</div><div class="kv" style="font-size:26px;font-weight:800;margin:8px 0;color:${budgetUsed>100?'var(--red)':budgetUsed>85?'var(--amber)':'var(--teal)'}">${budgetUsed}%</div><div class="kd ${budgetUsed>100?'kdn':budgetUsed>85?'kfl':'ku'}">${budgetUsed>100?'Over budget':budgetUsed>85?'Watch carefully':'Healthy spend'}</div></div>
   `;
 
-  // P&L Summary
+  // 3. Render Summary
   document.getElementById('pl-summary').innerHTML = `
     <div class="pl-section-row"><span class="pl-sec-lbl">Revenue (Budget)</span><span class="pl-sec-val">${fmtINR(totBudRev)}</span></div>
     <div class="pl-section-row"><span class="pl-sec-lbl">Revenue (Actual)</span><span class="pl-sec-val" style="color:var(--teal)">${fmtINR(totActRev)}</span></div>
@@ -499,64 +548,46 @@ function renderPL(){
     ${entries.length===0?'<div style="font-size:11px;color:var(--ink4);margin-top:8px;text-align:center">Add entries to see your P&L populate</div>':''}
   `;
 
-  // Category breakdowns
-  const cats = ['Labour','Infrastructure','Licensing','Services','Consulting','Sales','Other'];
-  const catColors = {'Labour':'var(--rose)','Infrastructure':'var(--violet)','Licensing':'var(--teal)','Services':'var(--amber)','Consulting':'var(--blue,#1a4a8a)','Sales':'var(--green)','Other':'var(--ink4)'};
-
-  function catBreakdown(type, containerId){
-    const filtered = entries.filter(e=>e.type===type);
-    const bycat = cats.map(c=>({ cat:c, budget:filtered.filter(e=>e.cat===c).reduce((a,e)=>a+e.budget,0), actual:filtered.filter(e=>e.cat===c).reduce((a,e)=>a+e.actual,0) })).filter(x=>x.budget||x.actual);
-    const total = bycat.reduce((a,x)=>a+x.actual,0)||1;
-    document.getElementById(containerId).innerHTML = bycat.length ? bycat.map(x=>{
-      const pct=Math.round(x.actual/total*100);
-      return `<div style="margin-bottom:10px">
-        <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;margin-bottom:3px">
-          <span style="color:var(--ink2)">${x.cat}</span>
-          <span style="color:${catColors[x.cat]}">${fmtINR(x.actual)} <span style="color:var(--ink4);font-weight:400">(${pct}%)</span></span>
-        </div>
-        <div class="pgt"><div class="pgf" style="width:${pct}%;background:${catColors[x.cat]}"></div></div>
-      </div>`;
-    }).join('') : `<div class="empty" style="padding:10px"><h3>No ${type} entries</h3><p>Add entries to see breakdown</p></div>`;
-  }
-  catBreakdown('Revenue','pl-rev-breakdown');
-  catBreakdown('Cost','pl-cost-breakdown');
-
-  // Bar chart — by period
-  const periods = [...new Set(entries.map(e=>e.period||'Unset'))].filter(Boolean);
-  if(periods.length){
-    const maxV = Math.max(...periods.map(pr=>{
-      const ents = entries.filter(e=>(e.period||'Unset')===pr);
-      return Math.max(ents.reduce((a,e)=>a+e.budget,0), ents.reduce((a,e)=>a+e.actual,0), ents.reduce((a,e)=>a+e.forecast,0));
-    }), 1);
-    document.getElementById('pl-chart').innerHTML = periods.map(pr=>{
-      const ents = entries.filter(e=>(e.period||'Unset')===pr);
-      const bud=ents.reduce((a,e)=>a+e.budget,0);
-      const act=ents.reduce((a,e)=>a+e.actual,0);
-      const fcs=ents.reduce((a,e)=>a+e.forecast,0);
-      const h=(v)=>Math.max(4,Math.round(v/maxV*220));
+  // 4. Render Chart (Data from Python)
+  if(dash.chart.trend.length){
+    document.getElementById('pl-chart').innerHTML = dash.chart.trend.map(pr => {
+      const h = (v) => Math.max(4, Math.round(v / dash.chart.max_val * 220)); 
       return `<div class="pl-bar-group">
         <div class="pl-bar-wrap">
-          <div class="pl-bar" style="height:${h(bud)}px;width:16px;background:var(--violet);opacity:.7" data-tip="Budget: ${fmtINR(bud)}"></div>
-          <div class="pl-bar" style="height:${h(act)}px;width:16px;background:var(--teal)" data-tip="Actual: ${fmtINR(act)}"></div>
-          <div class="pl-bar" style="height:${h(fcs)}px;width:16px;background:var(--amber);opacity:.8" data-tip="Forecast: ${fmtINR(fcs)}"></div>
+          <div class="pl-bar" style="height:${h(pr.budget)}px;background:var(--violet)" title="Budget: ${fmtINR(pr.budget)}"></div>
+          <div class="pl-bar" style="height:${h(pr.actual)}px;background:var(--teal)" title="Actual: ${fmtINR(pr.actual)}"></div>
+          <div class="pl-bar" style="height:${h(pr.forecast)}px;background:var(--amber)" title="Forecast: ${fmtINR(pr.forecast)}"></div>
         </div>
       </div>`;
     }).join('');
-    document.getElementById('pl-chart-lbls').innerHTML = periods.map(pr=>`<div class="pl-lbl" style="flex:1;min-width:74px">${pr}</div>`).join('');
+    document.getElementById('pl-chart-lbls').innerHTML = dash.chart.trend.map(pr=>`<div class="pl-lbl" style="width:74px">${pr.period}</div>`).join('');
   } else {
-    document.getElementById('pl-chart').innerHTML='<div class="empty" style="width:100%;justify-content:center"><p style="font-size:12px;color:var(--ink4)">Set a period on entries to see the chart</p></div>';
+    document.getElementById('pl-chart').innerHTML='<div class="empty" style="width:100%;justify-content:center"><p style="font-size:12px;color:var(--ink4)">Set a period on entries</p></div>';
     document.getElementById('pl-chart-lbls').innerHTML='';
   }
 
-  // Filter + table
-  let filtered = entries;
-  if(typeF) filtered=filtered.filter(e=>e.type===typeF);
-  if(catF) filtered=filtered.filter(e=>e.cat===catF);
+  // 5. Render Categories (Data from Python)
+  const catColors = {'Labour':'var(--rose)','Infrastructure':'var(--violet)','Licensing':'var(--teal)','Services':'var(--amber)','Consulting':'var(--blue,#1a4a8a)','Sales':'var(--green)','Other':'var(--ink4)'};
+  function drawCats(data, containerId) {
+    const total = data.reduce((a,x)=>a+x.actual,0) || 1;
+    document.getElementById(containerId).innerHTML = data.length ? data.map(x=>{
+      const pct=Math.round(x.actual/total*100);
+      return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;margin-bottom:3px"><span style="color:var(--ink2)">${x.cat}</span><span style="color:${catColors[x.cat]||'var(--ink4)'}">${fmtINR(x.actual)} <span style="color:var(--ink4);font-weight:400">(${pct}%)</span></span></div><div class="pgt"><div class="pgf" style="width:${pct}%;background:${catColors[x.cat]||'var(--ink4)'}"></div></div></div>`;
+    }).join('') : `<div class="empty" style="padding:10px"><h3>No entries</h3></div>`;
+  }
+  drawCats(dash.categories.Revenue, 'pl-rev-breakdown');
+  drawCats(dash.categories.Cost, 'pl-cost-breakdown');
+
+  // 6. Render Table (Filtering still happens on Frontend for speed)
+  const typeF = document.getElementById('pl-filter-type')?.value||'';
+  const catF = document.getElementById('pl-filter-cat')?.value||'';
+  if(typeF) entries = entries.filter(e=>e.type===typeF);
+  if(catF) entries = entries.filter(e=>e.cat===catF);
+  
   const statTag={'Planned':'tink','Committed':'tvio','Actual':'tgrn','Overrun':'tred'};
-  document.getElementById('pl-tbody').innerHTML = filtered.length ? filtered.map(e=>{
+  document.getElementById('pl-tbody').innerHTML = entries.length ? entries.map(e=>{
     const varAmt = e.actual - e.budget;
     const varClass = varAmt > 0 && e.type==='Cost' ? 'pl-var-neg' : varAmt < 0 && e.type==='Revenue' ? 'pl-var-neg' : varAmt !== 0 ? 'pl-var-pos' : '';
-    const varSign = varAmt>0?'+':'';
     return `<tr>
       <td><span class="tag ${e.type==='Revenue'?'tgrn':'tred'}">${e.type}</span><br/><span style="font-size:10px;color:var(--ink4)">${e.cat}</span></td>
       <td><div class="tn" style="font-size:12px">${e.desc}</div><div class="ts">${e.owner||'—'}</div></td>
@@ -565,14 +596,11 @@ function renderPL(){
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px">${fmtINR(e.budget)}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700">${fmtINR(e.actual)}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber)">${fmtINR(e.forecast)}</td>
-      <td class="${varClass}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${varSign}${fmtINR(varAmt)}</td>
+      <td class="${varClass}" style="font-family:'JetBrains Mono',monospace;font-size:11px">${varAmt>0?'+':''}${fmtINR(varAmt)}</td>
       <td><span class="tag ${statTag[e.status]||'tink'}">${e.status}</span></td>
-      <td><div style="display:flex;gap:3px">
-        <button class="btn btn-ghost btn-xs" onclick="openPLEntryModal('${e.id}')">Edit</button>
-        <button class="btn btn-danger btn-xs" onclick="delPLEntry('${e.id}')">Del</button>
-      </div></td>
+      <td><div style="display:flex;gap:3px"><button class="btn btn-ghost btn-xs" onclick="openPLEntryModal('${e.id}')">Edit</button><button class="btn btn-danger btn-xs" onclick="delPLEntry('${e.id}')">Del</button></div></td>
     </tr>`;
-  }).join('') : `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--ink4)">No entries yet. <a href="#" onclick="openPLEntryModal()" style="color:var(--rose)">Add your first P&L entry →</a></td></tr>`;
+  }).join('') : `<tr><td colspan="10" style="text-align:center;padding:24px;color:var(--ink4)">No entries found.</td></tr>`;
 }
 
 /* ══════════════════════════════

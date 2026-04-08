@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import os
-from routers import ai, core_pm, pl
+from routers import ai, core_pm, pl, auth
 
 load_dotenv()
 # --- FASTAPI APP ---
@@ -29,3 +29,4 @@ def serve_frontend():
 app.include_router(core_pm.router)
 app.include_router(ai.router)
 app.include_router(pl.router)
+app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
